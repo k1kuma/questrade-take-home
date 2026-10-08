@@ -22,27 +22,49 @@ const AmountSchema = z
 
 const HoldingInputSchema = z.object({ asset: AssetSchema, amount: AmountSchema });
 
-export const PortfolioInputSchema = z.preprocess(
-  // Accept the brief's bare-array body as well as { holdings: [...] }.
-  (body) => (Array.isArray(body) ? { holdings: body } : body),
-  z
-    .object({ holdings: z.array(HoldingInputSchema).max(100) })
-    .superRefine(({ holdings }, ctx) => {
-      const seen = new Set<Asset>();
-      holdings.forEach((holding, index) => {
-        if (seen.has(holding.asset)) {
-          ctx.addIssue({
-            code: 'custom',
-            message: `Duplicate asset ${holding.asset}`,
-            path: ['holdings', index, 'asset'],
-          });
-        }
-        seen.add(holding.asset);
-      });
-    }),
-);
+const HoldingsInputSchema = z
+  .array(HoldingInputSchema)
+  .max(100)
+  .superRefine((holdings, ctx) => {
+    const seen = new Set<Asset>();
+    holdings.forEach((holding, index) => {
+      if (seen.has(holding.asset)) {
+        ctx.addIssue({ code: 'custom', message: `Duplicate asset ${holding.asset}`, path: [index, 'asset'] });
+      }
+      seen.add(holding.asset);
+    });
+  });
+
+export const PortfolioNameSchema = z.string().trim().min(1, 'Name is required').max(100);
+
+/** The full form for POST and PUT: a name is required. */
+export const PortfolioInputSchema = z.object({
+  name: PortfolioNameSchema,
+  holdings: HoldingsInputSchema,
+});
+
+/** The brief's bare-array body, wrapped as { holdings }: POST auto-names it, PUT keeps the current name. */
+export const HoldingsOnlyInputSchema = z.object({ holdings: HoldingsInputSchema });
 
 export type PortfolioInput = z.output<typeof PortfolioInputSchema>;
+/** What a client sends for `{ name, holdings }`, before the schema's trimming and normalising. */
+export type PortfolioRequest = z.input<typeof PortfolioInputSchema>;
+
+export const ListPortfoliosQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export type PortfolioSummary = {
+  id: string;
+  name: string;
+  assets: Asset[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PortfolioList = {
+  portfolios: PortfolioSummary[];
+};
 
 export type Holding = {
   asset: Asset;
@@ -51,6 +73,7 @@ export type Holding = {
 
 export type Portfolio = {
   id: string;
+  name: string;
   holdings: Holding[];
   createdAt: string;
   updatedAt: string;

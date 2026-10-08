@@ -1,11 +1,9 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { createApp } from './app';
-import { openDatabase } from './db/connection';
-import { PortfolioRepository } from './portfolios/repository';
+import { createTestApp } from './testApp';
 
 function testApp() {
-  return createApp({ portfolios: new PortfolioRepository(openDatabase(':memory:')) });
+  return createTestApp().app;
 }
 
 describe('app', () => {

@@ -15,12 +15,12 @@ export class HttpError extends Error {
   }
 }
 
-export function validationError(error: z.ZodError): HttpError {
+export function validationError(error: z.ZodError, message = 'Request body is invalid'): HttpError {
   const details = error.issues.map((issue) => ({
     path: issue.path.map(String).join('.'),
     message: issue.message,
   }));
-  return new HttpError(400, 'VALIDATION_FAILED', 'Request body is invalid', details);
+  return new HttpError(400, 'VALIDATION_FAILED', message, details);
 }
 
 function sendError(res: Response, status: number, body: ApiError): void {

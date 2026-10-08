@@ -2,6 +2,8 @@ node_modules/
 dist/
 coverage/
 .env
+.env.*
+!.env.example
 data/
 *.db
 *.db-wal

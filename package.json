@@ -9,13 +9,18 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "npm run start -w @portfolio/api",
-    "dev": "npm run dev -w @portfolio/api",
+    "start": "concurrently --names api,web --prefix-colors blue,magenta --kill-others-on-fail \"npm:start:api\" \"npm:start:web\"",
+    "dev": "concurrently --names api,web --prefix-colors blue,magenta --kill-others-on-fail \"npm:dev:api\" \"npm:dev:web\"",
+    "start:api": "npm run start -w @portfolio/api",
+    "start:web": "npm run start -w @portfolio/web",
+    "dev:api": "npm run dev -w @portfolio/api",
+    "dev:web": "npm run dev -w @portfolio/web",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",
+    "concurrently": "^10.0.5",
     "typescript": "^7.0.2"
   }
 }
