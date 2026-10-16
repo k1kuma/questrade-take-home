@@ -78,7 +78,7 @@ The brief accepts either "a local `npm start` (or `docker compose up`)". I consi
 - **`PUT` replaces the full list of holdings** in one transaction, rather than patching individual holdings. That matches how the edit form saves, and an invalid `PUT` leaves the stored holdings untouched.
 - **`GET /portfolios`** returns the most recently updated portfolios first, with their assets, so the UI can pick one. It's backed by an index on `updated_at`, with `?limit` (default 50, maximum 200) so the response can't grow without bound. The assets are loaded in one extra query for the whole page, not one query per portfolio. The brief didn't ask for it, but without it the UI has no way to find a portfolio.
 - **`price_cache` stores two timestamps** because they mean different things. `as_of` decides whether a price is too old to use as a fallback; `fetched_at` decides whether we need to ask the upstream again.
-- **Migrations** are an append-only list of SQL scripts. The database's `PRAGMA user_version` records how many have run. `migrate(db, target)` can stop at a version, so a test can build an old schema, insert rows, and check that a later migration upgrades real data correctly.
+- **Migrations** are an append-only list of SQL scripts. The database's `PRAGMA user_version` records how many have run. `migrate(db, target)` can stop at a version, so an old schema can be built, filled with rows, and upgraded to check that a later migration handles real data.
 - **Portfolio names are required, added by a migration after the fact.** SQLite's `ADD COLUMN` can't add a `NOT NULL` column without a default. The migration therefore uses a placeholder default that only satisfies the constraint for rows that already exist, then renames those rows "Portfolio 1…N" in creation order in the same transaction. Names aren't unique; the UUID stays the identity.
 
 ## Input validation
@@ -112,7 +112,7 @@ The brief accepts either "a local `npm start` (or `docker compose up`)". I consi
 - **Every call has a timeout** (`AbortSignal.timeout`, default 4 s). It covers both the wait for headers and reading the body, so a stalled upstream can't hold a request open.
 - **CoinGecko is asked for `precision=full`.** By default it rounds prices; BTC came back as whole dollars.
 - **Coins missing from a response are left out**, not treated as an error. CoinGecko silently omits ids it doesn't recognise, and one missing coin shouldn't throw away the rest. The price service treats a missing coin as "no price" (`bad_response`) and doesn't ask for it again until its 60 seconds pass.
-- **`fetch` can be swapped in tests**, so they cover 429, timeouts and malformed responses without network calls.
+- **`fetch` can be swapped in tests**, so they cover 429s and timeouts without network calls.
 
 ## Caching and freshness
 
@@ -131,7 +131,7 @@ The goal is to make upstream traffic depend on the clock, not on how many client
 **Fiat (Frankfurter): exploit the once-a-day publishing schedule (`FiatRateCache`, `ecbCalendar`)**
 - **One call gets everything.** A call with the native EUR base returns every currency, and each currency's CAD price is computed as `EURCAD / EURX` with `decimal.js`.
   - I avoided `?base=CAD`: Frankfurter rounds those cross rates to about 5 significant figures, and inverting them rounds a second time. EUR→CAD came back as 1.59839… instead of the ECB's 1.5984.
-- **The whole rate table is fetched again only after the next expected ECB publish:** 16:00 Frankfurt time on weekdays. The calendar converts that to UTC correctly in both summer and winter time; tests cover the October DST change. That's about one call per working day.
+- **The whole rate table is fetched again only after the next expected ECB publish:** 16:00 Frankfurt time on weekdays. The calendar converts that to UTC correctly in both summer and winter time. That's about one call per working day.
 - **What "fresh" means for a rate:** we've successfully checked Frankfurter since the last expected publish, whatever date the rate carries. So Friday's rate on Sunday is correctly labelled fresh, because it is the current rate.
 - **When the expected date hasn't appeared yet:** if we've checked since publish time but still have an older date (the ECB is late, or it's a holiday), we check again every 30 minutes. I didn't model ECB holidays: Good Friday, Easter Monday, May 1, and Dec 25 and 26. On those days this costs at most 48 extra calls a day, and only while clients are asking. With more time I'd add the holiday calendar.
 - **`as_of` for a fiat rate is 16:00 Frankfurt time on its ECB date**, which makes it comparable with crypto's timestamps.
@@ -143,7 +143,7 @@ The goal is to make upstream traffic depend on the clock, not on how many client
 - **Frankfurter: about one call per working day**, plus at most two an hour while an expected ECB publish is late.
 - **The budget doesn't grow with traffic or with the number of portfolios.** It does grow with the number of API instances, because each process has its own cache, and the rate limit is per account. That's why Redis comes before a second instance (see "How I'd extend it").
 
-**Restart behaviour:** every successful fetch is written to `price_cache`, which is read back at startup. A restart within the 60 seconds makes no calls, and fallback prices survive. A test checks this.
+**Restart behaviour:** every successful fetch is written to `price_cache`, which is read back at startup. A restart within the 60 seconds makes no calls, and fallback prices survive.
 
 ## Upstream failure handling
 
@@ -271,7 +271,7 @@ The goal is to make upstream traffic depend on the clock, not on how many client
   - Nothing is sent until **Save**, and closing discards the copy simply by unmounting the editor.
   - **It's a modal on the native `<dialog>`** ([Modal.tsx](apps/web/src/components/Modal.tsx)). `showModal()` gives the focus trap, inert page and Esc handling, so there's no dialog library. A draft that isn't sent until Save is a self-contained task, and a modal stops the editor pushing the value and chart down the page or showing unsaved amounts next to the old total. On phones it's a full-screen sheet with Cancel/Save pinned to the bottom.
   - **Closing never drops edits silently.** Cancel, Esc, the × button and a backdrop click all go through one `requestClose`: with no changes it closes; with changes it swaps the footer for "Discard your unsaved changes?" (**Keep editing** / **Discard**); during a save it does nothing. Esc is handled on `keydown`, because browsers can skip the dialog's `cancel` event (Chrome does on a repeated Esc) and close it outright.
-  - The two footers have different React `key`s. Without them React reused the button elements, so a focused **Keep editing** became the focused **Save** button mid-keypress and Enter saved the draft; a test pins this.
+  - The two footers have different React `key`s. Without them React reused the button elements, so a focused **Keep editing** became the focused **Save** button mid-keypress and Enter saved the draft.
   - A refetch of the portfolio while you're editing (e.g. on tab focus) doesn't touch your edits, because the reducer was initialised once and isn't kept in sync.
 - **The reducer ([draft.ts](apps/web/src/components/editor/draft.ts)) is plain functions with no React:** `rename`, `addRow`, `removeRow`, `editRow`. It's unit-tested directly.
   - Every row gets a stable client-side `key`, not its array index, so removing a row can't move another row's input or error message.
@@ -311,7 +311,7 @@ The goal is to make upstream traffic depend on the clock, not on how many client
   - Across a gap where nobody looked, the value is unknown, and a step would claim it stayed flat. **Line** (`curveLinear`) joins the points directly, which is the usual reading of a value chart and doesn't pretend to know more.
   - I first shipped Step only. Seeing real data changed my mind: most history is "looked at occasionally", where steps overstate certainty, and an edit drew a wall rising from the bottom of the chart.
   - Either way, **real snapshots get a dot** (while they're at least 6 px apart on average), so interpolated stretches are visibly not observations.
-- **The tooltip only ever reports a real snapshot.** In Step mode, it's the one in effect at the cursor (the last at or before it), not the nearest, which could be a value that hadn't happened yet. In Line mode, it's the nearest snapshot, because the values between points are interpolated. Both use one binary search (O(log n)) and are tested.
+- **The tooltip only ever reports a real snapshot.** In Step mode, it's the one in effect at the cursor (the last at or before it), not the nearest, which could be a value that hadn't happened yet. In Line mode, it's the nearest snapshot, because the values between points are interpolated. Both use one binary search (O(log n)).
 - **Honest about stale prices:** valuations made with stale prices get a yellow marker, and the summary under the chart says what the markers mean. Downsampling can't hide them, because a bucket is degraded if any snapshot in it was.
 - **Ranges: 24h / 7d / 30d / All.** The range's start time is computed when the request is made, not stored in the query key, which would otherwise change on every render. While a new range or width loads, the previous chart stays visible (`keepPreviousData`) with an "Updating…" note.
   - When the data starts after the range does, the x-axis starts at the first snapshot, and the caption says so ("The chart starts at the first snapshot (…)"). Earlier, the axis always covered the whole range, which honestly showed the empty days but squeezed a few hours of real data into a sliver at the right edge.
@@ -335,37 +335,22 @@ The goal is to make upstream traffic depend on the clock, not on how many client
 
 **Retries:** TanStack retries only network failures and 5xx other than 503, twice. It doesn't retry a 4xx (it won't change) or a 503 (the countdown handles that, honouring `Retry-After` instead of guessing). The countdown is the only timed fetch, and a 503 never records a snapshot.
 
-**Tests:**
-- `ValuationPanel` is rendered against mocked `fetch` responses to check that a degraded response shows its banner, badge and stale rows, and that a 503 shows the unpriced asset, no total, and the countdown.
-- A routing test checks that `/` lists each portfolio as a link to `/portfolios/:id`.
-- The editor's tests check that:
-  - unedited rows keep their identity, so their memoisation works;
-  - an invalid amount is blocked before any request is sent;
-  - a full edit (rename, change, add, remove) sends exactly one `PUT` with the expected body;
-  - a server 400 appears next to the right row, without losing the edits;
-  - creating sends the bare array when the name is blank (so the API names it) and `{ name, holdings }` when it isn't, then opens the new portfolio;
-  - it opens as a modal and closes straight away when nothing changed;
-  - with unsaved changes, Cancel and Esc ask before discarding, and the confirmation's buttons are never reused as Save/Cancel.
-- The chart's tests check:
-  - the step-chart lookup at the exact edges (before the first point, on a point, after the last);
-  - the y-axis padding, including for a flat line;
-  - the width-to-`maxPoints` rule;
-  - that it renders one path, with markers only for degraded snapshots;
-  - that a single snapshot renders as a dot, and that every real snapshot gets a dot or a stale marker;
-  - that Line and Step draw different paths, and that the line tooltip picks the nearest real snapshot (including ties and both ends).
-
 ## Tests
 
-`npm test` runs 73 API tests (Vitest + supertest against an in-memory SQLite database, with `fetch` replaced, so there are no network calls) and 23 web tests (Vitest + Testing Library). The ones I'd point to first are about failure, because that's where the design matters:
-- **429:** after a 429, the last good price is labelled stale, and no further calls are made until `Retry-After` passes. Through the HTTP API, a rate limit produces a degraded 200 that labels exactly which prices are stale.
-- **No partial totals:** a holding with no usable price gives a 503 with `Retry-After` and no total.
-- **Load:** concurrent requests for the same coins share one CoinGecko call; cached prices are served for 60 seconds; coins near expiry ride along.
-- **Fallback limits:** crypto older than 24 hours and fiat older than 7 days become unavailable instead of being served.
-- **Timeouts, 5xx, network errors and malformed JSON** each map to the right failure reason.
-- **ECB calendar:** Friday's rate is fresh on Sunday; the 16:00 publish time is correct in both summer and winter time; rechecks every 30 minutes while a publish is late.
-- **Restart:** portfolios and cached prices survive it, and no CoinGecko call is made within the 60 seconds.
-- **History:** snapshots are recorded only on change; downsampling thousands of snapshots keeps real values and degraded periods; retention deletes in batches.
-- **Front end:** see the test list under "Front end" above.
+The brief says one meaningful test beats twenty trivial ones, so the suite is kept to tests that check a requirement of the brief. `npm test` runs 18 API tests (Vitest + supertest against an in-memory SQLite database, with `fetch` replaced, so there are no network calls) and 6 web tests (Vitest + Testing Library).
+
+| Requirement | Tests |
+|---|---|
+| 1. `POST /portfolios`, persisted | Creates from the brief's bare array; `PUT` replaces the holdings; a portfolio survives a restart (same SQLite file reopened) |
+| 2. `GET /value`, one normalised shape | Every holding valued in CAD with one shape; the CoinGecko client makes one call for all coins and normalises it; the Frankfurter client turns EUR-based ECB rates into CAD prices |
+| 3. Good citizen toward upstreams | 10 concurrent requests share one CoinGecko call; a cached price is served for 60 seconds, then refetched; Friday's ECB rates stay fresh all weekend and are refetched only after Monday's publish |
+| 4. Honest failure | **The one I'd point to first:** when CoinGecko rate-limits, `/value` returns a degraded 200 that labels exactly which prices are stale. Also: after a 429 no calls are made until `Retry-After` passes; a holding with no usable price gives a 503 with `Retry-After` and no partial total; a 429 and a timeout map to the right failure reasons |
+| 5. History, and stopping growth | Raw points in time order; a new snapshot only when the value changes; downsampling 5,000 snapshots keeps real values and degraded periods (checked against a reference implementation); retention deletes old snapshots in batches |
+| Front end 1 & 4: value, failure and stale states | A degraded response shows the banner, the badge and the stale rows; a 503 shows the unpriced asset, no total, and the retry countdown |
+| Front end 2: edit holdings | A full edit (rename, change, add, remove) sends exactly one `PUT` with the expected body; editing one row leaves the other row objects untouched, so only that row re-renders |
+| Front end 3: chart stays responsive | `maxPoints` follows the chart width (about one point per pixel); the chart renders one path, with markers only for degraded snapshots |
+
+Out of scope on purpose: input-validation edge cases, 404s, list/paging, migrations, logging, chart tooltip helpers and dialog behaviour. They worked when written, but they don't test the brief.
 
 ## How I'd extend it
 

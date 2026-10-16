@@ -93,7 +93,7 @@ npm run typecheck   # TypeScript, all workspaces
 npm run build -w @portfolio/web   # production build of the web app
 ```
 
-Tests use in-memory SQLite and fake upstream clients, so they never call CoinGecko or Frankfurter. The test that best represents the brief is in `apps/api/src/valuation/valuation.test.ts`: *"when CoinGecko rate-limits, returns a degraded 200 that labels exactly which prices are stale"*.
+Tests use in-memory SQLite and fake upstream clients, so they never call CoinGecko or Frankfurter. The suite is kept small: each test checks a requirement of the brief (the mapping is in [DECISIONS.md](DECISIONS.md#tests)). The test that best represents the brief is in `apps/api/src/valuation/valuation.test.ts`: *"when CoinGecko rate-limits, returns a degraded 200 that labels exactly which prices are stale"*.
 
 ## Layout
 
