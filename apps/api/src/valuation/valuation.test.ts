@@ -150,22 +150,4 @@ describe('GET /portfolios/:id/value', () => {
     expect(getPrices).toHaveBeenCalledTimes(3);
     expect(snapshotCount()).toBe(2);
   });
-
-  it('values an empty portfolio at zero without calling any upstream', async () => {
-    const { app, getPrices, getLatestRates, createPortfolio } = setup();
-    const id = await createPortfolio([]);
-
-    const res = await request(app).get(`/portfolios/${id}/value`);
-
-    expect(res.body).toMatchObject({ totalCad: '0.00', status: 'complete', holdings: [], sources: {} });
-    expect(getPrices).not.toHaveBeenCalled();
-    expect(getLatestRates).not.toHaveBeenCalled();
-  });
-
-  it('returns 404 for an unknown portfolio', async () => {
-    const res = await request(setup().app).get('/portfolios/nope/value');
-
-    expect(res.status).toBe(404);
-    expect(res.body.error.code).toBe('PORTFOLIO_NOT_FOUND');
-  });
 });

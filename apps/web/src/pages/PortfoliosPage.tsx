@@ -1,69 +1,91 @@
-import { Link, useNavigate } from 'react-router';
-import { useCreatePortfolio, usePortfolios, type NewHolding } from '../api/hooks';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
+import { usePortfolios } from '../api/hooks';
+import { NewPortfolioDialog } from '../components/editor/NewPortfolioDialog';
 import { formatDateTime } from '../format';
-
-const EXAMPLE_HOLDINGS: NewHolding[] = [
-  { asset: 'BTC', amount: 0.5 },
-  { asset: 'ETH', amount: 10 },
-  { asset: 'USD', amount: 2500 },
-  { asset: 'EUR', amount: 1000 },
-];
 
 // The API's default page size; past this the list would need pagination.
 const PAGE_SIZE = 50;
 
 export function PortfoliosPage() {
   const portfolios = usePortfolios();
-  const create = useCreatePortfolio();
-  const navigate = useNavigate();
+  const [creating, setCreating] = useState(false);
+  const newButton = useRef<HTMLButtonElement>(null);
+  const wasCreating = useRef(false);
   const list = portfolios.data?.portfolios ?? [];
+
+  // Cancelling returns focus to the button that opened the dialog; creating navigates away instead.
+  useEffect(() => {
+    if (wasCreating.current && !creating) newButton.current?.focus();
+    wasCreating.current = creating;
+  }, [creating]);
 
   return (
     <>
-      <h1>Portfolios</h1>
-      <p>
-        <button
-          onClick={() =>
-            create.mutate(EXAMPLE_HOLDINGS, { onSuccess: (portfolio) => navigate(`/portfolios/${portfolio.id}`) })
-          }
-          disabled={create.isPending}
-        >
-          {create.isPending ? 'Creating…' : 'New example portfolio'}
+      <div className="page-header">
+        <div>
+          <h1>Portfolios</h1>
+          <p className="meta">Crypto and fiat holdings, valued live in Canadian dollars.</p>
+        </div>
+        <button ref={newButton} className="btn-primary" onClick={() => setCreating(true)}>
+          New portfolio
         </button>
-      </p>
-      {create.error && <p role="alert">Could not create a portfolio: {create.error.message}</p>}
+      </div>
+      {creating && <NewPortfolioDialog onClose={() => setCreating(false)} />}
 
-      {portfolios.isPending && <p role="status">Loading portfolios…</p>}
-      {portfolios.error && (
-        <p role="alert" className="banner banner-error">
-          Could not load portfolios: {portfolios.error.message}{' '}
-          <button onClick={() => void portfolios.refetch()}>Retry</button>
-        </p>
-      )}
-      {portfolios.isSuccess && list.length === 0 && <p>No portfolios yet. Create one to get started.</p>}
-      {list.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">No. of holdings</th>
-              <th scope="col">Last updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((portfolio) => (
-              <tr key={portfolio.id}>
-                <td>
-                  <Link to={`/portfolios/${portfolio.id}`}>{portfolio.name}</Link>
-                </td>
-                <td>{portfolio.assets.length}</td>
-                <td>{formatDateTime(portfolio.updatedAt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {list.length === PAGE_SIZE && <p className="meta">Showing the {PAGE_SIZE} most recently updated portfolios.</p>}
+      <section className="card" aria-label="All portfolios">
+        {portfolios.isPending && (
+          <p role="status" className="loading">
+            Loading portfolios…
+          </p>
+        )}
+        {portfolios.error && (
+          <p role="alert" className="banner banner-error">
+            Could not load portfolios: {portfolios.error.message}{' '}
+            <button className="btn-link" onClick={() => void portfolios.refetch()}>
+              Retry
+            </button>
+          </p>
+        )}
+        {portfolios.isSuccess && list.length === 0 && (
+          <p className="empty">No portfolios yet. Create one to get started.</p>
+        )}
+        {list.length > 0 && (
+          <div className="table-scroll">
+            <table className="portfolio-list">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col" className="num">
+                    No. of holdings
+                  </th>
+                  <th scope="col" className="num">
+                    Last updated
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((portfolio) => (
+                  <tr key={portfolio.id}>
+                    <td className="cell-name">
+                      <Link to={`/portfolios/${portfolio.id}`}>{portfolio.name}</Link>
+                    </td>
+                    <td className="num cell-count" data-label="Holdings">
+                      {portfolio.assets.length}
+                    </td>
+                    <td className="num meta cell-updated" data-label="Updated">
+                      {formatDateTime(portfolio.updatedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {list.length === PAGE_SIZE && (
+          <p className="meta">Showing the {PAGE_SIZE} most recently updated portfolios.</p>
+        )}
+      </section>
     </>
   );
 }

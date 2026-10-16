@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import type { HoldingValuation, PortfolioValuation } from '@portfolio/contracts';
-import { describeAsOf, formatCad, formatUnitPrice, REASON_TEXT, SOURCE_LABEL } from '../format';
+import { describeAsOf, formatAmount, formatCad, REASON_TEXT, SOURCE_LABEL } from '../format';
 
 /** Rendered only for degraded valuations: says which upstream failed and that the affected prices are not live. */
 export function FreshnessBanner({ valuation }: { valuation: PortfolioValuation }) {
@@ -28,34 +28,44 @@ export function FreshnessBanner({ valuation }: { valuation: PortfolioValuation }
 
 // Memoized: TanStack Query keeps `holdings` referentially equal when a refetch returns identical data.
 export const HoldingsTable = memo(function HoldingsTable({ holdings }: { holdings: HoldingValuation[] }) {
-  if (holdings.length === 0) return <p>This portfolio has no holdings.</p>;
+  if (holdings.length === 0) return <p className="empty">This portfolio has no holdings.</p>;
   return (
-    <table>
-      <thead>
-        <tr>
-          <th scope="col">Asset</th>
-          <th scope="col">Amount</th>
-          <th scope="col">Unit price</th>
-          <th scope="col">Subtotal</th>
-          <th scope="col">Price as of</th>
-        </tr>
-      </thead>
-      <tbody>
-        {holdings.map((holding) => (
-          <tr key={holding.asset} className={holding.stale ? 'stale' : undefined}>
-            <th scope="row">{holding.asset}</th>
-            <td>{holding.amount}</td>
-            <td>{formatUnitPrice(holding.unitPriceCad)}</td>
-            <td>{formatCad(holding.subtotalCad)}</td>
-            <td>
-              {describeAsOf(holding)}
-              {holding.stale && holding.staleReason && (
-                <span className="badge">Stale: source {REASON_TEXT[holding.staleReason]}</span>
-              )}
-            </td>
+    <div className="table-scroll">
+      <table className="holdings-table">
+        <thead>
+          <tr>
+            <th scope="col">Asset</th>
+            <th scope="col" className="num">Amount</th>
+            <th scope="col" className="num">Unit price</th>
+            <th scope="col" className="num">Subtotal</th>
+            <th scope="col" className="text-right">
+              Price as of
+            </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {holdings.map((holding) => (
+            <tr key={holding.asset} className={holding.stale ? 'stale' : undefined}>
+              <th scope="row" className="cell-asset">
+                {holding.asset}
+              </th>
+              <td className="num cell-amount" data-label="Amount">
+                {formatAmount(holding.amount)}
+              </td>
+              <td className="num cell-price" data-label="Unit price">
+                {formatCad(holding.unitPriceCad)}
+              </td>
+              <td className="num cell-subtotal">{formatCad(holding.subtotalCad)}</td>
+              <td className="meta text-right cell-asof" data-label="As of">
+                {describeAsOf(holding)}
+                {holding.stale && holding.staleReason && (
+                  <span className="badge">Stale: source {REASON_TEXT[holding.staleReason]}</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 });

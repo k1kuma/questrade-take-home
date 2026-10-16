@@ -1,14 +1,13 @@
 import type { FailureReason, HoldingValuation, UpstreamName } from '@portfolio/contracts';
 
 const cad = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' });
-// Unit prices span $0.13 (DOGE) to $120,000 (BTC), so precision is by significant digits.
-const unitPrice = new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumSignificantDigits: 8 });
+const amount = new Intl.NumberFormat('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateTime = new Intl.DateTimeFormat('en-CA', { dateStyle: 'medium', timeStyle: 'medium' });
 const day = new Intl.DateTimeFormat('en-CA', { dateStyle: 'medium' });
 
 // Number() is display-only; all arithmetic happened server-side in decimals.
 export const formatCad = (value: string) => cad.format(Number(value));
-export const formatUnitPrice = (value: string) => unitPrice.format(Number(value));
+export const formatAmount = (value: string) => amount.format(Number(value));
 export const formatDateTime = (iso: string) => dateTime.format(new Date(iso));
 
 export function describeAsOf(holding: HoldingValuation): string {

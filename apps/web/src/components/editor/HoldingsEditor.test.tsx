@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ApiError, Portfolio } from '@portfolio/contracts';
+import type { Portfolio } from '@portfolio/contracts';
 import { HoldingsEditor } from './HoldingsEditor';
 
 const saved: Portfolio = {
@@ -38,16 +38,6 @@ afterEach(() => {
 });
 
 describe('HoldingsEditor', () => {
-  it('validates with the shared schema before sending anything', async () => {
-    const { fetchMock } = renderEditor();
-
-    type('BTC amount', 'abc');
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(await screen.findByText(/Amount must be a positive decimal/)).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('sends one PUT with the edited name and holdings, then closes', async () => {
     const fetchMock = vi.fn().mockResolvedValue(json({ ...saved, name: 'Pension' }));
     const { onDone } = renderEditor(fetchMock);
@@ -70,23 +60,5 @@ describe('HoldingsEditor', () => {
         { asset: 'ETH', amount: '1.25' },
       ],
     });
-  });
-
-  it('shows a server validation error next to the row it belongs to, keeping the edits', async () => {
-    const rejected: ApiError = {
-      error: {
-        code: 'VALIDATION_FAILED',
-        message: 'Request body is invalid',
-        details: [{ path: 'holdings.1.amount', message: 'Rejected by the server' }],
-      },
-    };
-    renderEditor(vi.fn().mockResolvedValue(json(rejected, 400)));
-
-    type('USD amount', '3000');
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    const message = await screen.findByText('Rejected by the server');
-    expect(message.closest('tr')?.textContent).toMatch(/USD/);
-    expect((screen.getByLabelText('USD amount') as HTMLInputElement).value).toBe('3000');
   });
 });

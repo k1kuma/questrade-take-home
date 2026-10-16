@@ -45,10 +45,11 @@ export function useValuation(portfolioId: string) {
     queryKey: queryKeys.valuation(portfolioId),
     queryFn: ({ signal }) =>
       apiFetch<PortfolioValuation>(`/portfolios/${encodeURIComponent(portfolioId)}/value`, { signal }),
-    staleTime: 30_000,
-    // Matches the server's 60s crypto window; polling faster would only re-read its cache.
-    // Paused while errored: the error notice owns retrying then.
-    refetchInterval: (query) => (query.state.status === 'error' ? false : 60_000),
+    // On demand only: fetched each time the portfolio page opens (and after a save), never on a timer or on
+    // tab focus. Each valuation may record a history point, so points come only from someone opening it.
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: (failureCount, error) => isTransient(error) && failureCount < 2,
   });
 }
@@ -78,13 +79,17 @@ export function useHistory(portfolioId: string, range: HistoryRange, maxPoints: 
 }
 
 export type NewHolding = { asset: string; amount: string | number };
+export type NewPortfolio = { name?: string; holdings: NewHolding[] };
 
 export function useCreatePortfolio() {
   const queryClient = useQueryClient();
   return useMutation({
-    // A bare holdings array: the API names it "Portfolio N".
-    mutationFn: (holdings: NewHolding[]) =>
-      apiFetch<Portfolio>('/portfolios', { method: 'POST', body: JSON.stringify(holdings) }),
+    // Without a name, send the bare holdings array so the API names it "Portfolio N".
+    mutationFn: ({ name, holdings }: NewPortfolio) =>
+      apiFetch<Portfolio>('/portfolios', {
+        method: 'POST',
+        body: JSON.stringify(name?.trim() ? { name, holdings } : holdings),
+      }),
     // Returning nothing: TanStack would otherwise wait for the list refetch before the caller's onSuccess.
     onSuccess: (portfolio) => {
       queryClient.setQueryData(queryKeys.portfolio(portfolio.id), portfolio);

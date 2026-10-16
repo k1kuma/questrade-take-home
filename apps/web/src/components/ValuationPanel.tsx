@@ -13,7 +13,7 @@ export function ValuationPanel({ portfolioId }: { portfolioId: string }) {
   if (isPending) return <LoadingValue />;
 
   return (
-    <section aria-label="Portfolio value">
+    <section aria-label="Portfolio value" className="card value-card">
       {error && (
         <ErrorNotice
           // A new failure restarts the Retry-After countdown.
@@ -31,10 +31,12 @@ export function ValuationPanel({ portfolioId }: { portfolioId: string }) {
 function LoadingValue() {
   const slow = useDelayedFlag(1000);
   return (
-    <p role="status" aria-busy="true">
-      Loading portfolio value…
-      {slow && ' Fetching live prices from CoinGecko and the ECB can take a few seconds.'}
-    </p>
+    <section className="card">
+      <p role="status" aria-busy="true" className="loading">
+        Loading portfolio value…
+        {slow && ' Fetching live prices from CoinGecko and the ECB can take a few seconds.'}
+      </p>
+    </section>
   );
 }
 
@@ -42,14 +44,18 @@ function ValuationSummary({ valuation, refreshing }: { valuation: PortfolioValua
   return (
     <>
       <FreshnessBanner valuation={valuation} />
-      <p className="total">
-        Total value: <strong>{formatCad(valuation.totalCad)}</strong>
-        {valuation.status === 'degraded' && <span className="badge">includes stale prices</span>}
-      </p>
-      <p className="meta">
-        Computed {formatDateTime(valuation.computedAt)}
-        {refreshing && <span aria-live="polite"> · Refreshing…</span>}
-      </p>
+      <div className="value-summary">
+        <p className="stat-label">Total value</p>
+        <p className="total">
+          <strong>{formatCad(valuation.totalCad)}</strong>
+          {valuation.status === 'degraded' && <span className="badge">includes stale prices</span>}
+        </p>
+        <p className="meta">
+          Computed {formatDateTime(valuation.computedAt)}
+          {refreshing && <span aria-live="polite"> · Refreshing…</span>}
+        </p>
+      </div>
+      <h2 className="holdings-title">Holdings</h2>
       <HoldingsTable holdings={valuation.holdings} />
     </>
   );
@@ -79,7 +85,10 @@ function ErrorNotice({ error, shownValuesFrom, onRetry }: ErrorNoticeProps) {
   return (
     <div role="alert" className="banner banner-error">
       <strong>{shownValuesFrom ? 'Could not refresh the value.' : 'Could not load the value.'}</strong> {cause}
-      {staleNote} <button onClick={onRetry}>Retry</button>
+      {staleNote}{' '}
+      <button className="btn-link" onClick={onRetry}>
+        Retry
+      </button>
     </div>
   );
 }
@@ -105,7 +114,9 @@ function PricesUnavailableNotice({ details, retryAfterSeconds, staleNote, onRetr
       </ul>
       No total is shown rather than a partial one.{staleNote}{' '}
       {remaining > 0 ? `Retrying automatically in ${remaining}s.` : 'Retrying…'}{' '}
-      <button onClick={onRetry}>Try now</button>
+      <button className="btn-link" onClick={onRetry}>
+        Try now
+      </button>
     </div>
   );
 }

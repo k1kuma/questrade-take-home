@@ -1,8 +1,10 @@
-import { ASSETS, type Portfolio, type PortfolioRequest } from '@portfolio/contracts';
+import { ASSETS, type PortfolioRequest } from '@portfolio/contracts';
 
 /** Values are kept as typed (strings) until save; parsing is the shared schema's job. */
 export type DraftRow = { key: string; asset: string; amount: string };
 export type Draft = { name: string; rows: DraftRow[] };
+/** What a draft starts from: a saved portfolio when editing, a template when creating. */
+export type DraftSource = { name: string; holdings: readonly { asset: string; amount: string }[] };
 
 export type DraftAction =
   | { type: 'rename'; name: string }
@@ -14,10 +16,10 @@ let lastKey = 0;
 // Stable row identity, so React keys and error messages stay with a row when another is removed.
 const newKey = () => `row-${++lastKey}`;
 
-export function toDraft(portfolio: Portfolio): Draft {
+export function toDraft(source: DraftSource): Draft {
   return {
-    name: portfolio.name,
-    rows: portfolio.holdings.map((holding) => ({ key: newKey(), asset: holding.asset, amount: holding.amount })),
+    name: source.name,
+    rows: source.holdings.map((holding) => ({ key: newKey(), asset: holding.asset, amount: holding.amount })),
   };
 }
 
@@ -48,9 +50,21 @@ export function toRequest(draft: Draft): PortfolioRequest {
   };
 }
 
-export function isDirty(draft: Draft, saved: Portfolio): boolean {
+/** Display-level check only; the shared schema still validates whatever is submitted. */
+export function hasPositiveAmount(rows: readonly DraftRow[]): boolean {
+  return rows.some((row) => Number(row.amount.trim()) > 0);
+}
+
+const ZERO = /^0+(\.0*)?$|^\.0+$/;
+
+/** Rows left at 0 mean "not held"; the schema rejects a 0 amount, so they're left out instead. */
+export function withoutZeroAmounts(draft: Draft): Draft {
+  return { ...draft, rows: draft.rows.filter((row) => !ZERO.test(row.amount.trim())) };
+}
+
+export function isDirty(draft: Draft, initial: DraftSource): boolean {
   const request = toRequest(draft);
-  return request.name !== saved.name || JSON.stringify(request.holdings) !== JSON.stringify(saved.holdings);
+  return request.name !== initial.name || JSON.stringify(request.holdings) !== JSON.stringify(initial.holdings);
 }
 
 /** Keys: 'name', `${rowKey}.asset`, `${rowKey}.amount`, or 'form' for anything not tied to one field. */

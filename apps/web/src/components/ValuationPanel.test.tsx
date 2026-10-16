@@ -27,12 +27,12 @@ describe('ValuationPanel', () => {
     const degraded: PortfolioValuation = {
       portfolioId: 'p1',
       currency: 'CAD',
-      totalCad: '61420.00',
+      totalCad: '61423.46',
       status: 'degraded',
       computedAt: '2026-10-05T12:00:00.000Z',
       holdings: [
         { asset: 'BTC', amount: '0.5', unitPriceCad: '120000', subtotalCad: '60000.00', source: 'coingecko', asOf: '2026-10-05T11:55:00.000Z', stale: true, staleReason: 'rate_limited' },
-        { asset: 'USD', amount: '1000', unitPriceCad: '1.42', subtotalCad: '1420.00', source: 'frankfurter', asOf: '2026-10-05T14:00:00.000Z', stale: false },
+        { asset: 'USD', amount: '1000', unitPriceCad: '1.4234567', subtotalCad: '1423.46', source: 'frankfurter', asOf: '2026-10-05T14:00:00.000Z', stale: false },
       ],
       sources: {
         coingecko: { status: 'stale', reason: 'rate_limited', retryAt: '2026-10-05T12:01:00.000Z' },
@@ -50,7 +50,12 @@ describe('ValuationPanel', () => {
     const btcRow = screen.getByRole('row', { name: /BTC/ });
     expect(btcRow.className).toBe('stale');
     expect(within(btcRow).getByText(/Stale: source is rate-limiting requests/)).toBeTruthy();
-    expect(screen.getByRole('row', { name: /USD/ }).className).toBe('');
+    expect(within(btcRow).getByText('0.50')).toBeTruthy();
+    expect(within(btcRow).getByText('$120,000.00')).toBeTruthy();
+    const usdRow = screen.getByRole('row', { name: /USD/ });
+    expect(usdRow.className).toBe('');
+    expect(within(usdRow).getByText('1,000.00')).toBeTruthy();
+    expect(within(usdRow).getByText('$1.42')).toBeTruthy();
   });
 
   it('on 503 explains which assets cannot be priced, shows no total, and counts down to a retry', async () => {

@@ -10,11 +10,8 @@ export function toChartPoints(points: HistoryPoint[]): ChartPoint[] {
   });
 }
 
-/**
- * The point in effect at `time` on a step chart: the last one at or before it (binary search, O(log n)).
- * Not the nearest point: a later snapshot hadn't happened yet at `time`.
- */
-export function pointAtOrBefore(points: ChartPoint[], time: number): ChartPoint | undefined {
+/** Index of the first point after `time` (binary search, O(log n)); points are in time order. */
+function firstIndexAfter(points: ChartPoint[], time: number): number {
   let low = 0;
   let high = points.length;
   while (low < high) {
@@ -22,7 +19,27 @@ export function pointAtOrBefore(points: ChartPoint[], time: number): ChartPoint 
     if (points[mid]!.time <= time) low = mid + 1;
     else high = mid;
   }
-  return points[low - 1];
+  return low;
+}
+
+/**
+ * The point in effect at `time` on a step chart: the last one at or before it.
+ * Not the nearest point: a later snapshot hadn't happened yet at `time`.
+ */
+export function pointAtOrBefore(points: ChartPoint[], time: number): ChartPoint | undefined {
+  return points[firstIndexAfter(points, time) - 1];
+}
+
+/**
+ * The real snapshot closest to `time`, for a line chart. Values between points there are
+ * interpolated, so the tooltip reports an actual snapshot rather than a value nobody observed.
+ */
+export function nearestPoint(points: ChartPoint[], time: number): ChartPoint | undefined {
+  const index = firstIndexAfter(points, time);
+  const before = points[index - 1];
+  const after = points[index];
+  if (!before || !after) return before ?? after;
+  return time - before.time <= after.time - time ? before : after;
 }
 
 export function valueExtent(points: ChartPoint[]): [number, number] {
